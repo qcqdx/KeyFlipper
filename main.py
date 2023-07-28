@@ -16,6 +16,10 @@ mapping = {
 }
 
 
+def on_closing():
+    app.destroy()
+
+
 def convert_layout(text):
     result = []
     for char in text:
@@ -37,34 +41,36 @@ def update_output(*args):
     output_var.set(convert_layout(input_text))
 
 
-def copy_to_clipboard(event):
+def copy_to_clipboard():
     widget = app.focus_get()
     if isinstance(widget, tk.Entry):
         selected_text = widget.selection_get()
         app.clipboard_clear()
         app.clipboard_append(selected_text)
-        return 'break'  # Отключаем стандартное поведение
 
 
-def paste_from_clipboard(event):
+def paste_from_clipboard(event=None):
     widget = app.focus_get()
-    if isinstance(widget, tk.Entry):
+    if isinstance(widget, tk.Entry) and widget.winfo_exists():
         clipboard_text = app.clipboard_get()
-        widget.delete("sel.first", "sel.last")
+        try:
+            widget.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
         widget.insert(tk.INSERT, clipboard_text)
-        return 'break'  # Отключаем стандартное поведение
+        return 'break'  # Отключаем стандартное поведение и предотвращаем двойную вставку
+
+
+def show_context_menu(event):
+    try:
+        context_menu.tk_popup(event.x_root, event.y_root)
+    finally:
+        context_menu.grab_release()
 
 
 app = tk.Tk()
 app.title("Конвертер раскладки")
-
-# Учитываем кроссплатформенность
-if app.tk.call('tk', 'windowingsystem') == 'aqua':  # macOS
-    app.bind_all('<Command-c>', copy_to_clipboard)
-    app.bind_all('<Command-v>', paste_from_clipboard)
-else:  # Windows и Linux
-    app.bind_all('<Control-c>', copy_to_clipboard)
-    app.bind_all('<Control-v>', paste_from_clipboard)
+app.protocol("WM_DELETE_WINDOW", on_closing)
 
 input_var = StringVar()
 input_var.trace_add("write", update_output)
@@ -72,9 +78,20 @@ input_var.trace_add("write", update_output)
 output_var = StringVar()
 
 Label(app, text="Введите текст:").pack(pady=10)
-Entry(app, textvariable=input_var).pack(pady=10, padx=10, fill=tk.X)
+input_entry = Entry(app, textvariable=input_var)
+input_entry.pack(pady=10, padx=10, fill=tk.X)
+input_entry.bind("<Button-2>", show_context_menu)  # Используем <Button-2> для кроссплатформенности
+input_entry.bind('<Control-v>', paste_from_clipboard)  # Переопределение поведения
 
 Label(app, text="Преобразованный текст:").pack(pady=10)
-Entry(app, textvariable=output_var, state="readonly").pack(pady=10, padx=10, fill=tk.X)
+output_entry = Entry(app, textvariable=output_var, state="readonly")
+output_entry.pack(pady=10, padx=10, fill=tk.X)
+output_entry.bind("<Button-2>", show_context_menu)  # Используем <Button-2> для кроссплатформенности
+output_entry.bind('<Control-v>', paste_from_clipboard)  # Переопределение поведения
+
+# Создание контекстного меню
+context_menu = tk.Menu(app, tearoff=0)
+context_menu.add_command(label="Копировать", command=copy_to_clipboard)
+context_menu.add_command(label="Вставить", command=paste_from_clipboard)
 
 app.mainloop()
