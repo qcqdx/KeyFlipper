@@ -16,23 +16,55 @@ mapping = {
 }
 
 
-def update_output(*args):
-    input_text = input_var.get()
-    output_var.set(convert_layout(input_text))
-
-
 def convert_layout(text):
     result = []
     for char in text:
+        # Проверка языка и преобразование в другой язык
         if char in mapping:
             result.append(mapping[char])
+        elif char in mapping.values():
+            for key, value in mapping.items():
+                if char == value:
+                    result.append(key)
+                    break
         else:
             result.append(char)
     return ''.join(result)
 
 
+def update_output(*args):
+    input_text = input_var.get()
+    output_var.set(convert_layout(input_text))
+
+
+def copy_to_clipboard(event):
+    widget = app.focus_get()
+    if isinstance(widget, tk.Entry):
+        selected_text = widget.selection_get()
+        app.clipboard_clear()
+        app.clipboard_append(selected_text)
+        return 'break'  # Отключаем стандартное поведение
+
+
+def paste_from_clipboard(event):
+    widget = app.focus_get()
+    if isinstance(widget, tk.Entry):
+        clipboard_text = app.clipboard_get()
+        widget.delete("sel.first", "sel.last")
+        widget.insert(tk.INSERT, clipboard_text)
+        return 'break'  # Отключаем стандартное поведение
+
+
 app = tk.Tk()
 app.title("Конвертер раскладки")
+
+# Учитываем кроссплатформенность
+if app.tk.call('tk', 'windowingsystem') == 'aqua':  # macOS
+    app.bind_all('<Command-c>', copy_to_clipboard)
+    app.bind_all('<Command-v>', paste_from_clipboard)
+else:  # Windows и Linux
+    app.bind_all('<Control-c>', copy_to_clipboard)
+    app.bind_all('<Control-v>', paste_from_clipboard)
 
 input_var = StringVar()
 input_var.trace_add("write", update_output)
